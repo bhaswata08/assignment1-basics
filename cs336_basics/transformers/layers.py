@@ -4,7 +4,7 @@ import math
 from typing import override
 
 import torch
-from einops import einsum, rearrange, reduce
+from einops import einsum, reduce
 from jaxtyping import Float, Int
 from torch import Tensor, nn
 
@@ -92,16 +92,17 @@ class RMSNorm(nn.Module):
         """
         super().__init__()
         self.eps: float = eps
-        self.gamma: Float[nn.Parameter, d_model] = nn.Parameter(
+        self.weight: Float[nn.Parameter, d_model] = nn.Parameter(
             torch.ones((d_model), dtype=dtype, device=device),
         )
 
     @override
-    def forward(self, x: Float[Tensor, "batch_size seq_len d_model"]) -> Float[Tensor, "batch_size seq_len d_model"]:
+    def forward(self, x: Float[Tensor, "... d_model"]) -> Float[Tensor, "... d_model"]:
         in_dtype = x.dtype
         x = x.to(torch.float32)  # Prevent overflow
-        std = reduce(x, "batch_size seq_len d_model -> batch_size seq_len", reduction=torch.std)
-        result = (x / torch.sqrt(rearrange(std, "b s -> b s 1") + self.eps)) * self.gamma
+        mean_sq = reduce(x**2, "... d_model -> ... 1", reduction=torch.mean)  # $\sum x^2$
+        rsqrt = torch.rsqrt(mean_sq + self.eps)  # $\frac{1}{\sqrt{\sum x^2}}$
+        result = x * rsqrt * self.weight
         return result.to(in_dtype)
 
 
