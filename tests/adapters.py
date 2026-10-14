@@ -9,7 +9,7 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
-from cs336_basics.transformers.layers import Embedding, Linear, RMSNorm
+from cs336_basics.model.layers import Embedding, Linear, RMSNorm, RoPE, SwiGLU, softmax
 
 
 def run_linear(
@@ -32,7 +32,7 @@ def run_linear(
     """
 
     lin_layer = Linear(in_features=d_in, out_features=d_out)
-    _ = lin_layer.load_state_dict({"W": weights})
+    _ = lin_layer.load_state_dict({"weight": weights})
     return lin_layer(in_features)
 
     # raise NotImplementedError
@@ -57,7 +57,7 @@ def run_embedding(
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
     emb_layer = Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
-    _ = emb_layer.load_state_dict({"W": weights})
+    _ = emb_layer.load_state_dict({"weight": weights})
 
     return emb_layer(token_ids)
 
@@ -93,7 +93,17 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    swiglu_layer = SwiGLU(d_model=d_model, d_ff=d_ff)
+    _ = swiglu_layer.load_state_dict(
+        {
+            "w1.weight": w1_weight,
+            "w2.weight": w2_weight,
+            "w3.weight": w3_weight,
+        }
+    )
+    return swiglu_layer(in_features)
+
+    # raise NotImplementedError
 
 
 def run_scaled_dot_product_attention(
@@ -210,7 +220,8 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
+    rope = RoPE(theta=theta, d_k=d_k, max_seq_len=max_seq_len)
+    return rope(in_query_or_key, token_positions)
 
 
 def run_transformer_block(
@@ -443,7 +454,7 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    raise NotImplementedError
+    return softmax(in_features, dim)
 
 
 def run_cross_entropy(
